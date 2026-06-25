@@ -7,3 +7,16 @@ python-dotenv>=1.0.0
 pandas>=2.0.0
 huggingface-hub>=0.20.0
 torch>=2.0.0
+
+streamlit
+langchain
+langchain-community
+chromadb
+torch
+openai-whisper
+edge-tts
+huggingface-hub
+transformers
+sentence-transformers
+python-dotenv
+requests
