@@ -1,10 +1,5 @@
-# 解决Streamlit部署Chroma sqlite版本过低报错
-try:
-    __import__('pysqlite3')
-    import sys
-    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-except ImportError:
-    pass
+import os
+os.environ['HF_ENDPOINT'] = 'https://huggingface.co'
 
 import streamlit as st
 import os
