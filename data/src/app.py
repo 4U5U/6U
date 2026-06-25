@@ -5,6 +5,10 @@ import streamlit as st
 import os
 import re
 import requests
+import tempfile
+import asyncio
+import edge_tts
+import whisper
 from dotenv import load_dotenv
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -22,7 +26,48 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ------------------- 缓存资源（增加加载提示） -------------------
+# ------------------- 语音模型缓存（ASR语音转文字） -------------------
+@st.cache_resource(show_spinner="正在加载语音识别模型...")
+def load_asr_model():
+    """Whisper语音识别模型，全局缓存只加载一次"""
+    return whisper.load_model("base")
+
+# 语音转文字函数
+def speech_to_text(audio_bytes):
+    model = load_asr_model()
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp.write(audio_bytes)
+        tmp_path = tmp.name
+    try:
+        result = model.transcribe(tmp_path, language="zh")
+        return result["text"].strip()
+    finally:
+        os.unlink(tmp_path)
+
+# 文字转语音函数（Edge-TTS免费在线合成）
+async def tts_generate(text, output_path="reply_voice.mp3"):
+    voice_name = "zh-CN-YunyangNeural"
+    communicate = edge_tts.Communicate(text, voice_name)
+    await communicate.save_sync(output_path)
+    return output_path
+
+def play_answer_voice(text):
+    """生成语音并在页面自动播放"""
+    try:
+        audio_path = asyncio.run(tts_generate(text))
+        st.audio(audio_path, autoplay=True)
+        # 延时删除临时音频文件
+        def remove_audio():
+            import time
+            time.sleep(8)
+            if os.path.exists(audio_path):
+                os.unlink(audio_path)
+        import threading
+        threading.Thread(target=remove_audio).start()
+    except Exception as e:
+        st.warning(f"语音播放异常：{str(e)}")
+
+# ------------------- 原有向量库资源缓存 -------------------
 @st.cache_resource(show_spinner="正在加载文本向量化模型...")
 def load_embeddings():
     """加载BGE中文嵌入模型，全局缓存只加载一次"""
@@ -174,14 +219,31 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar="👤" if msg["role"]=="user" else "🤖"):
         st.markdown(msg["content"])
 
-# 聊天输入框，支持侧边快捷填充
+# ========== 新增：麦克风语音输入控件 ==========
+st.divider()
+col1, col2 = st.columns([4,1])
+with col1:
+    audio_input = st.audio_input("🎤 按住麦克风说话提问校园问题")
+with col2:
+    st.info("语音提问模式")
+
+# 处理语音输入逻辑
+voice_text = ""
+if audio_input:
+    with st.spinner("正在识别语音内容..."):
+        voice_text = speech_to_text(audio_input.getvalue())
+        st.success(f"识别结果：{voice_text}")
+        # 把识别文字赋值给提问变量
+        st.session_state["temp_input"] = voice_text
+
+# 聊天输入框，支持侧边快捷填充 + 语音填充
 input_text = st.chat_input("请输入你的校园问题...")
-# 侧边快捷提问赋值
+# 侧边快捷提问 / 语音提问赋值
 if "temp_input" in st.session_state and st.session_state["temp_input"]:
     input_text = st.session_state["temp_input"]
     del st.session_state["temp_input"]
 
-# 处理用户提问
+# 处理用户提问（文字/语音共用一套问答逻辑）
 if input_text:
     # 保存用户消息
     st.session_state.messages.append({"role": "user", "content": input_text})
@@ -193,4 +255,6 @@ if input_text:
         with st.spinner("AI正在检索知识库并思考答案..."):
             res = agent_answer(input_text)
         st.markdown(res)
+        # 自动朗读回答语音
+        play_answer_voice(res)
         st.session_state.messages.append({"role": "assistant", "content": res})
