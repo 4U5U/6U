@@ -5,10 +5,6 @@ import streamlit as st
 import os
 import re
 import requests
-import tempfile
-import asyncio
-import edge_tts
-import whisper
 from dotenv import load_dotenv
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -26,48 +22,79 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ------------------- 语音模型缓存（ASR语音转文字） -------------------
-@st.cache_resource(show_spinner="正在加载语音识别模型...")
-def load_asr_model():
-    """Whisper语音识别模型，全局缓存只加载一次"""
-    return whisper.load_model("base")
+# ===================== 全局自定义CSS美化（核心改版部分） =====================
+def inject_custom_style():
+    custom_css = """
+    <style>
+    /* 全局页面渐变背景 */
+    .stApp {
+        background: linear-gradient(120deg, #f0f4fd 0%, #f7f3ff 100%);
+    }
 
-# 语音转文字函数
-def speech_to_text(audio_bytes):
-    model = load_asr_model()
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        tmp.write(audio_bytes)
-        tmp_path = tmp.name
-    try:
-        result = model.transcribe(tmp_path, language="zh")
-        return result["text"].strip()
-    finally:
-        os.unlink(tmp_path)
+    /* 侧边栏整体美化 */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.06);
+    }
 
-# 文字转语音函数（Edge-TTS免费在线合成）
-async def tts_generate(text, output_path="reply_voice.mp3"):
-    voice_name = "zh-CN-YunyangNeural"
-    communicate = edge_tts.Communicate(text, voice_name)
-    await communicate.save_sync(output_path)
-    return output_path
+    /* 侧边栏按钮样式 */
+    [data-testid="stSidebar"] button {
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        transition: all 0.2s ease;
+    }
+    [data-testid="stSidebar"] button:hover {
+        background-color: #eef4ff;
+        border-color: #6389e8;
+    }
 
-def play_answer_voice(text):
-    """生成语音并在页面自动播放"""
-    try:
-        audio_path = asyncio.run(tts_generate(text))
-        st.audio(audio_path, autoplay=True)
-        # 延时删除临时音频文件
-        def remove_audio():
-            import time
-            time.sleep(8)
-            if os.path.exists(audio_path):
-                os.unlink(audio_path)
-        import threading
-        threading.Thread(target=remove_audio).start()
-    except Exception as e:
-        st.warning(f"语音播放异常：{str(e)}")
+    /* 聊天气泡整体容器 */
+    .stChatMessage {
+        padding: 6px 10px;
+    }
 
-# ------------------- 原有向量库资源缓存 -------------------
+    /* AI消息（左侧气泡） */
+    .stChatMessage[data-testid="assistant"] .stMarkdown {
+        background: #ffffff;
+        border-radius: 18px 18px 18px 4px;
+        padding: 14px 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        max-width: 85%;
+    }
+
+    /* 用户消息（右侧蓝色气泡） */
+    .stChatMessage[data-testid="user"] .stMarkdown {
+        background: #4285f4;
+        color: white;
+        border-radius: 18px 18px 4px 18px;
+        padding: 14px 20px;
+        margin-left: auto;
+        max-width: 85%;
+    }
+
+    /* 输入框美化 */
+    [data-testid="stChatInput"] textarea {
+        border-radius: 12px;
+        padding: 12px 16px;
+        border: 1px solid #d0d8e8;
+    }
+
+    /* 标题卡片样式 */
+    .title-card {
+        background: #ffffff;
+        padding: 22px 28px;
+        border-radius: 16px;
+        box-shadow: 0 3px 14px rgba(99, 137, 232, 0.12);
+        margin-bottom: 20px;
+    }
+    </style>
+    """
+    st.markdown(custom_css, unsafe_allow_html=True)
+
+# 执行样式注入
+inject_custom_style()
+
+# ------------------- 缓存资源（增加加载提示） -------------------
 @st.cache_resource(show_spinner="正在加载文本向量化模型...")
 def load_embeddings():
     """加载BGE中文嵌入模型，全局缓存只加载一次"""
@@ -167,11 +194,11 @@ def agent_answer(question):
     # 默认知识库问答
     return rag_retrieve_answer(question)
 
-# ------------------- 侧边栏功能面板（新增丰富交互） -------------------
+# ------------------- 侧边栏功能面板（美化排版） -------------------
 with st.sidebar:
     st.header("⚙️ 功能面板")
     st.divider()
-    # 功能介绍
+    # 功能介绍卡片
     st.subheader("✨ 三大核心能力")
     st.markdown("""
     1. 📚 校园知识库问答
@@ -201,12 +228,14 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# ------------------- 主页面聊天UI美化 -------------------
+# ------------------- 主页面聊天UI全新改版 -------------------
+# 标题卡片包裹
+st.markdown('<div class="title-card">', unsafe_allow_html=True)
 st.title("🏫 校园生活百事通助手")
 st.markdown("""
 > 基于本地校园知识库 + 大模型RAG智能问答，兼顾周数查询、绩点计算，一站式解决校园全部疑问
 """)
-st.divider()
+st.markdown('</div>', unsafe_allow_html=True)
 
 # 初始化对话记录
 if "messages" not in st.session_state:
@@ -219,31 +248,14 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar="👤" if msg["role"]=="user" else "🤖"):
         st.markdown(msg["content"])
 
-# ========== 新增：麦克风语音输入控件 ==========
-st.divider()
-col1, col2 = st.columns([4,1])
-with col1:
-    audio_input = st.audio_input("🎤 按住麦克风说话提问校园问题")
-with col2:
-    st.info("语音提问模式")
-
-# 处理语音输入逻辑
-voice_text = ""
-if audio_input:
-    with st.spinner("正在识别语音内容..."):
-        voice_text = speech_to_text(audio_input.getvalue())
-        st.success(f"识别结果：{voice_text}")
-        # 把识别文字赋值给提问变量
-        st.session_state["temp_input"] = voice_text
-
-# 聊天输入框，支持侧边快捷填充 + 语音填充
+# 聊天输入框，支持侧边快捷填充
 input_text = st.chat_input("请输入你的校园问题...")
-# 侧边快捷提问 / 语音提问赋值
+# 侧边快捷提问赋值
 if "temp_input" in st.session_state and st.session_state["temp_input"]:
     input_text = st.session_state["temp_input"]
     del st.session_state["temp_input"]
 
-# 处理用户提问（文字/语音共用一套问答逻辑）
+# 处理用户提问
 if input_text:
     # 保存用户消息
     st.session_state.messages.append({"role": "user", "content": input_text})
@@ -255,6 +267,4 @@ if input_text:
         with st.spinner("AI正在检索知识库并思考答案..."):
             res = agent_answer(input_text)
         st.markdown(res)
-        # 自动朗读回答语音
-        play_answer_voice(res)
         st.session_state.messages.append({"role": "assistant", "content": res})
