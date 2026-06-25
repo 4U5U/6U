@@ -22,77 +22,96 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ===================== 全局自定义CSS美化（核心改版部分） =====================
-def inject_custom_style():
-    custom_css = """
+# ===================== 自定义美化CSS（布局+样式核心） =====================
+def set_custom_css():
+    custom_style = """
     <style>
-    /* 全局页面渐变背景 */
+    /* 全局渐变背景 */
     .stApp {
-        background: linear-gradient(120deg, #f0f4fd 0%, #f7f3ff 100%);
+        background: linear-gradient(135deg, #f5f7fa 0%, #e8f0fe 100%);
     }
 
     /* 侧边栏整体美化 */
     [data-testid="stSidebar"] {
         background-color: #ffffff !important;
-        box-shadow: 2px 0 12px rgba(0,0,0,0.06);
+        box-shadow: 3px 0 10px rgba(0, 0, 0, 0.05);
+        padding: 10px 5px;
+    }
+    [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+        color: #2563eb;
     }
 
     /* 侧边栏按钮样式 */
     [data-testid="stSidebar"] button {
-        border-radius: 10px;
-        border: 1px solid #e2e8f0;
-        transition: all 0.2s ease;
+        width: 100%;
+        border-radius: 9px;
+        border: 1px solid #dbeafe;
+        background-color: #f8fafc;
+        transition: 0.25s ease all;
+        margin: 3px 0;
     }
     [data-testid="stSidebar"] button:hover {
-        background-color: #eef4ff;
-        border-color: #6389e8;
+        background-color: #dbeafe;
+        border-color: #2563eb;
+        color: #1d4ed8;
     }
 
-    /* 聊天气泡整体容器 */
-    .stChatMessage {
-        padding: 6px 10px;
+    /* 顶部标题卡片容器 */
+    .header-card {
+        background-color: #ffffff;
+        padding: 24px 30px;
+        border-radius: 16px;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.1);
+        margin-bottom: 25px;
     }
 
-    /* AI消息（左侧气泡） */
-    .stChatMessage[data-testid="assistant"] .stMarkdown {
+    /* AI消息气泡 居左 */
+    div[data-testid="stChatMessage"][aria-label="assistant"] {
+        margin: 8px 0;
+    }
+    div[data-testid="stChatMessage"][aria-label="assistant"] .stMarkdown {
         background: #ffffff;
-        border-radius: 18px 18px 18px 4px;
-        padding: 14px 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-        max-width: 85%;
+        padding: 13px 18px;
+        border-radius: 18px 18px 18px 5px;
+        box-shadow: 0 2px 7px rgba(0,0,0,0.08);
+        max-width: 82%;
     }
 
-    /* 用户消息（右侧蓝色气泡） */
-    .stChatMessage[data-testid="user"] .stMarkdown {
-        background: #4285f4;
-        color: white;
-        border-radius: 18px 18px 4px 18px;
-        padding: 14px 20px;
-        margin-left: auto;
-        max-width: 85%;
+    /* 用户消息气泡 居右蓝色 */
+    div[data-testid="stChatMessage"][aria-label="user"] {
+        margin: 8px 0;
+        display: flex;
+        flex-direction: row-reverse;
+    }
+    div[data-testid="stChatMessage"][aria-label="user"] .stMarkdown {
+        background: #2563eb;
+        color: #ffffff;
+        padding: 13px 18px;
+        border-radius: 18px 18px 5px 18px;
+        box-shadow: 0 2px 7px rgba(37, 99, 235, 0.2);
+        max-width: 82%;
     }
 
-    /* 输入框美化 */
+    /* 底部输入框美化 */
+    [data-testid="stChatInput"] {
+        padding-top: 15px;
+    }
     [data-testid="stChatInput"] textarea {
         border-radius: 12px;
+        border: 1px solid #bfdbfe;
         padding: 12px 16px;
-        border: 1px solid #d0d8e8;
     }
 
-    /* 标题卡片样式 */
-    .title-card {
-        background: #ffffff;
-        padding: 22px 28px;
-        border-radius: 16px;
-        box-shadow: 0 3px 14px rgba(99, 137, 232, 0.12);
-        margin-bottom: 20px;
+    /* 分割线美化 */
+    hr {
+        border-top: 1px solid #e2e8f0 !important;
     }
     </style>
     """
-    st.markdown(custom_css, unsafe_allow_html=True)
+    st.markdown(custom_style, unsafe_allow_html=True)
 
-# 执行样式注入
-inject_custom_style()
+# 注入样式
+set_custom_css()
 
 # ------------------- 缓存资源（增加加载提示） -------------------
 @st.cache_resource(show_spinner="正在加载文本向量化模型...")
@@ -198,7 +217,7 @@ def agent_answer(question):
 with st.sidebar:
     st.header("⚙️ 功能面板")
     st.divider()
-    # 功能介绍卡片
+    # 功能介绍
     st.subheader("✨ 三大核心能力")
     st.markdown("""
     1. 📚 校园知识库问答
@@ -228,9 +247,9 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# ------------------- 主页面聊天UI全新改版 -------------------
-# 标题卡片包裹
-st.markdown('<div class="title-card">', unsafe_allow_html=True)
+# ------------------- 主页面布局重构美化 -------------------
+# 标题放入卡片容器
+st.markdown('<div class="header-card">', unsafe_allow_html=True)
 st.title("🏫 校园生活百事通助手")
 st.markdown("""
 > 基于本地校园知识库 + 大模型RAG智能问答，兼顾周数查询、绩点计算，一站式解决校园全部疑问
@@ -243,7 +262,7 @@ if "messages" not in st.session_state:
         {"role": "assistant", "content": "你好！我是校园百事通，有任何校园问题、想查教学周、计算绩点都可以直接问我~"}
     ]
 
-# 渲染历史对话
+# 渲染历史对话气泡
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar="👤" if msg["role"]=="user" else "🤖"):
         st.markdown(msg["content"])
